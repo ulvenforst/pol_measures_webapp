@@ -1,0 +1,5 @@
+fastapi
+uvicorn[standard]
+numpy
+scipy
+pol_measures @ git+https://github.com/Ulvenforst/pol_measures.git

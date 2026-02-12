@@ -15,6 +15,10 @@ export function exportTablesToExcel(
     if (dists.length === 0) continue;
 
     const header = ["Measure", ...dists.map((d) => d.name)];
+    const weightsRow = [
+      "",
+      ...dists.map((d) => `[${d.weights.map((w) => w.toFixed(4)).join(", ")}]`),
+    ];
 
     const rows = table.measureOrder.map((measureName) => {
       const row: (string | number | null)[] = [measureName];
@@ -25,7 +29,7 @@ export function exportTablesToExcel(
       return row;
     });
 
-    const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+    const ws = XLSX.utils.aoa_to_sheet([header, weightsRow, ...rows]);
     const sheetName = table.name.slice(0, 31);
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
   }

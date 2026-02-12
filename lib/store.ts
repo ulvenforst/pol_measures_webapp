@@ -29,6 +29,11 @@ interface AppState {
   addToTable: (tableId: string, distId: string) => boolean;
   removeFromTable: (tableId: string, distId: string) => void;
   reorderMeasure: (tableId: string, fromIdx: number, toIdx: number) => void;
+  reorderDistribution: (
+    tableId: string,
+    fromIdx: number,
+    toIdx: number,
+  ) => void;
   addMeasureNames: (tableId: string, names: string[]) => void;
 }
 
@@ -137,6 +142,17 @@ export const useStore = create<AppState>()(
             const [item] = order.splice(fromIdx, 1);
             order.splice(toIdx, 0, item);
             return { ...t, measureOrder: order };
+          }),
+        })),
+
+      reorderDistribution: (tableId, fromIdx, toIdx) =>
+        set((state) => ({
+          tables: state.tables.map((t) => {
+            if (t.id !== tableId) return t;
+            const ids = [...t.distributionIds];
+            const [item] = ids.splice(fromIdx, 1);
+            ids.splice(toIdx, 0, item);
+            return { ...t, distributionIds: ids };
           }),
         })),
     }),

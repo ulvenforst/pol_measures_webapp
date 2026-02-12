@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
+import {
+  useState,
+  useMemo,
+  useEffect,
+  useRef,
+  createContext,
+  useContext,
+} from "react";
 import {
   ColumnDef,
   flexRender,
@@ -16,15 +23,19 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
+  type DraggableAttributes,
 } from "@dnd-kit/core";
+import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import {
   SortableContext,
   verticalListSortingStrategy,
+  horizontalListSortingStrategy,
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
   restrictToVerticalAxis,
+  restrictToHorizontalAxis,
   restrictToParentElement,
 } from "@dnd-kit/modifiers";
 import {
@@ -60,7 +71,7 @@ import {
   MeasureSparkline,
   type SparklinePoint,
 } from "@/components/measure-sparkline";
-import { Trash2, GripVertical } from "lucide-react";
+import { Trash2, GripVertical, GripHorizontal } from "lucide-react";
 
 interface Props {
   table: TableType;
@@ -123,10 +134,61 @@ function SortableRow({
   );
 }
 
+const DragHandleContext = createContext<{
+  attributes: DraggableAttributes;
+  listeners: SyntheticListenerMap | undefined;
+} | null>(null);
+
+export function ColumnDragHandle() {
+  const ctx = useContext(DragHandleContext);
+  if (!ctx) return null;
+  return (
+    <button
+      className="cursor-grab touch-none text-muted-foreground hover:text-foreground p-0.5"
+      {...ctx.attributes}
+      {...(ctx.listeners ?? {})}
+    >
+      <GripHorizontal className="h-3 w-3" />
+    </button>
+  );
+}
+
+function SortableColumnHeader({
+  headerId,
+  children,
+}: {
+  headerId: string;
+  children: React.ReactNode;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: headerId });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <DragHandleContext.Provider value={{ attributes, listeners }}>
+      <TableHead ref={setNodeRef} style={style}>
+        {children}
+      </TableHead>
+    </DragHandleContext.Provider>
+  );
+}
+
 export function TableView({ table }: Props) {
   const distributions = useStore((s) => s.distributions);
   const removeFromTable = useStore((s) => s.removeFromTable);
   const reorderMeasure = useStore((s) => s.reorderMeasure);
+  const reorderDistribution = useStore((s) => s.reorderDistribution);
   const saveDistribution = useStore((s) => s.saveDistribution);
   const [deleteTarget, setDeleteTarget] = useState<Distribution | null>(null);
   const backfillAttempted = useRef(new Set<string>());
@@ -233,8 +295,11 @@ export function TableView({ table }: Props) {
           accessorKey: d.id,
           header: () => (
             <div className="group/col space-y-1 min-w-[100px]">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1">
                 <span className="text-xs font-medium truncate">{d.name}</span>
+                <div className="flex-1 flex justify-center">
+                  <ColumnDragHandle />
+                </div>
                 {table.id !== DEFAULT_TABLE_ID && (
                   <Button
                     variant="ghost"
@@ -281,7 +346,12 @@ export function TableView({ table }: Props) {
     [table.measureOrder],
   );
 
-  function handleDragEnd(event: DragEndEvent) {
+  const distIds = useMemo(
+    () => table.distributionIds.slice(),
+    [table.distributionIds],
+  );
+
+  function handleRowDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
@@ -290,6 +360,17 @@ export function TableView({ table }: Props) {
     if (oldIndex === -1 || newIndex === -1) return;
 
     reorderMeasure(table.id, oldIndex, newIndex);
+  }
+
+  function handleColumnDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = distIds.indexOf(active.id as string);
+    const newIndex = distIds.indexOf(over.id as string);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    reorderDistribution(table.id, oldIndex, newIndex);
   }
 
   if (dists.length === 0) {
@@ -307,24 +388,48 @@ export function TableView({ table }: Props) {
           sensors={sensors}
           collisionDetection={closestCenter}
           modifiers={[restrictToVerticalAxis, restrictToParentElement]}
-          onDragEnd={handleDragEnd}
+          onDragEnd={handleRowDragEnd}
         >
           <Table>
             <TableHeader>
-              {tanstackTable.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => (
-                    <TableHead key={header.id}>
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext(),
-                          )}
-                    </TableHead>
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                modifiers={[restrictToHorizontalAxis, restrictToParentElement]}
+                onDragEnd={handleColumnDragEnd}
+              >
+                <SortableContext
+                  items={distIds}
+                  strategy={horizontalListSortingStrategy}
+                >
+                  {tanstackTable.getHeaderGroups().map((headerGroup) => (
+                    <TableRow key={headerGroup.id}>
+                      {headerGroup.headers.map((header) => {
+                        const isDist = distIds.includes(header.column.id);
+                        const content = header.isPlaceholder
+                          ? null
+                          : flexRender(
+                              header.column.columnDef.header,
+                              header.getContext(),
+                            );
+
+                        if (isDist) {
+                          return (
+                            <SortableColumnHeader
+                              key={header.id}
+                              headerId={header.column.id}
+                            >
+                              {content}
+                            </SortableColumnHeader>
+                          );
+                        }
+
+                        return <TableHead key={header.id}>{content}</TableHead>;
+                      })}
+                    </TableRow>
                   ))}
-                </TableRow>
-              ))}
+                </SortableContext>
+              </DndContext>
             </TableHeader>
             <SortableContext
               items={measureIds}

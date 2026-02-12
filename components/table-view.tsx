@@ -56,6 +56,10 @@ import {
 } from "@/lib/types";
 import { DEFAULT_TABLE_ID, EXPERT_CORRELATIONS } from "@/lib/default-table";
 import { generateX } from "@/components/distribution-editor";
+import {
+  MeasureSparkline,
+  type SparklinePoint,
+} from "@/components/measure-sparkline";
 import { Trash2, GripVertical } from "lucide-react";
 
 interface Props {
@@ -201,14 +205,25 @@ export function TableView({ table }: Props) {
             table.id === DEFAULT_TABLE_ID
               ? EXPERT_CORRELATIONS[measureName]
               : undefined;
+          const sparklineData: SparklinePoint[] = dists.reduce<
+            SparklinePoint[]
+          >((acc, d) => {
+            const v = row.original[d.id];
+            if (typeof v === "number" && !isNaN(v))
+              acc.push({ label: d.name, value: v });
+            return acc;
+          }, []);
           return (
             <div className="flex-1 flex items-center justify-between gap-2">
               <span className="text-sm font-medium">{measureName}</span>
-              {correlation != null && (
-                <span className="text-xs text-muted-foreground/60 tabular-nums">
-                  {correlation.toFixed(4)}
-                </span>
-              )}
+              <div className="flex items-center gap-2">
+                {correlation != null && (
+                  <span className="text-xs text-muted-foreground/60 tabular-nums">
+                    {correlation.toFixed(4)}
+                  </span>
+                )}
+                <MeasureSparkline data={sparklineData} />
+              </div>
             </div>
           );
         },

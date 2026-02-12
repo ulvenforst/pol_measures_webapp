@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog,
@@ -14,10 +15,21 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { useStore } from "@/lib/store";
 import { DEFAULT_TABLE_ID } from "@/lib/default-table";
 import { Table } from "@/lib/types";
-import { Trash2 } from "lucide-react";
+import { exportTablesToExcel } from "@/lib/export";
+import { Trash2, Plus, Download } from "lucide-react";
 
 interface Props {
   activeTableId: string | null;
@@ -25,9 +37,9 @@ interface Props {
 }
 
 export function TableSelector({ activeTableId, onSelect }: Props) {
-  const { tables, addTable, removeTable } = useStore();
+  const { tables, addTable, removeTable, distributions } = useStore();
   const [newName, setNewName] = useState("");
-  const [showInput, setShowInput] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Table | null>(null);
 
   const handleCreate = () => {
@@ -35,7 +47,7 @@ export function TableSelector({ activeTableId, onSelect }: Props) {
     const table = addTable(newName.trim());
     onSelect(table.id);
     setNewName("");
-    setShowInput(false);
+    setDialogOpen(false);
   };
 
   const confirmDelete = () => {
@@ -50,62 +62,86 @@ export function TableSelector({ activeTableId, onSelect }: Props) {
 
   return (
     <>
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-center gap-2 w-full min-w-0">
         {tables.length > 0 && (
-          <Tabs value={activeTableId ?? undefined} onValueChange={onSelect}>
-            <TabsList>
-              {tables.map((t) => (
-                <TabsTrigger key={t.id} value={t.id} className="gap-1">
-                  {t.name}
-                  {t.id !== DEFAULT_TABLE_ID && (
-                    <span
-                      role="button"
-                      className="ml-1 text-muted-foreground hover:text-destructive text-xs cursor-pointer"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        setDeleteTarget(t);
-                      }}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </span>
-                  )}
-                </TabsTrigger>
-              ))}
-            </TabsList>
+          <Tabs
+            value={activeTableId ?? undefined}
+            onValueChange={onSelect}
+            className="min-w-0 flex-1"
+          >
+            <ScrollArea className="w-full whitespace-nowrap [&>[data-slot=scroll-area-viewport]]:!overflow-y-hidden [&>[data-slot=scroll-area-scrollbar][data-orientation=vertical]]:hidden">
+              <TabsList>
+                {tables.map((t) => (
+                  <TabsTrigger key={t.id} value={t.id} className="gap-1">
+                    {t.name}
+                    {t.id !== DEFAULT_TABLE_ID && (
+                      <span
+                        role="button"
+                        className="ml-1 text-muted-foreground hover:text-destructive text-xs cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          setDeleteTarget(t);
+                        }}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </span>
+                    )}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
           </Tabs>
         )}
 
-        {showInput ? (
-          <div className="flex items-center gap-2">
-            <Input
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              placeholder="Table name"
-              className="h-8 w-40"
-              autoFocus
-              onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-            />
-            <Button size="sm" onClick={handleCreate}>
-              Create
+        <Button
+          variant="outline"
+          size="icon"
+          className="shrink-0"
+          onClick={() => exportTablesToExcel(tables, distributions)}
+        >
+          <Download />
+        </Button>
+
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline" size="icon" className="shrink-0">
+              <Plus />
             </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setShowInput(false)}
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-sm">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleCreate();
+              }}
             >
-              Cancel
-            </Button>
-          </div>
-        ) : (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowInput(true)}
-          >
-            + New Table
-          </Button>
-        )}
+              <DialogHeader>
+                <DialogTitle>New Table</DialogTitle>
+                <DialogDescription>
+                  Create a new table to organize and compare distributions.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="py-4">
+                <Input
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="Table name"
+                  autoFocus
+                />
+              </div>
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button variant="outline">Cancel</Button>
+                </DialogClose>
+                <Button type="submit" disabled={!newName.trim()}>
+                  Create
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <AlertDialog

@@ -205,6 +205,11 @@ export function TableView({ table }: Props) {
     [table.distributionIds, distributions],
   );
 
+  const maxWeight = useMemo(
+    () => Math.max(...dists.flatMap((d) => d.weights)),
+    [dists],
+  );
+
   useEffect(() => {
     for (const dist of dists) {
       const missingNames = table.measureOrder.filter(
@@ -315,6 +320,7 @@ export function TableView({ table }: Props) {
                 x={generateX(d.weights.length)}
                 weights={d.weights}
                 compact
+                maxWeight={maxWeight}
               />
             </div>
           ),

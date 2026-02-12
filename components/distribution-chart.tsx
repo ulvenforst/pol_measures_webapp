@@ -11,13 +11,19 @@ interface Props {
   x: number[];
   weights: number[];
   compact?: boolean;
+  maxWeight?: number;
 }
 
 const chartConfig = {
   weight: { label: "Weight", color: "var(--chart-1)" },
 };
 
-export function DistributionChart({ x, weights, compact = false }: Props) {
+export function DistributionChart({
+  x,
+  weights,
+  compact = false,
+  maxWeight,
+}: Props) {
   const data = x.map((xi, i) => ({
     x: xi.toFixed(2),
     weight: weights[i] ?? 0,
@@ -27,6 +33,7 @@ export function DistributionChart({ x, weights, compact = false }: Props) {
     return (
       <ChartContainer config={chartConfig} className="h-16 w-full">
         <BarChart data={data} margin={{ top: 2, right: 2, bottom: 2, left: 2 }}>
+          {maxWeight != null && <YAxis domain={[0, maxWeight]} hide />}
           <ChartTooltip
             content={
               <ChartTooltipContent

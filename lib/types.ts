@@ -57,6 +57,27 @@ export const MEASURE_TYPES: {
       { key: "beta", label: "beta", default: 1.15 },
     ],
   },
+  {
+    type: "GeneralizedMEC",
+    label: "Generalized MEC",
+    params: [
+      { key: "alpha", label: "alpha", default: 2 },
+      {
+        key: "alienation",
+        label: "alienation",
+        default: "d",
+        options: [
+          "d",
+          "d^2",
+          "d^3",
+          "d+d^2",
+          "d+2d^2",
+          "exp(d)-1",
+          "exp(2d)-1",
+        ],
+      },
+    ],
+  },
   { type: "EMD", label: "EMD", params: [] },
   { type: "Shannon", label: "Shannon", params: [] },
   { type: "VanDerEijk", label: "Van der Eijk", params: [] },
@@ -91,6 +112,8 @@ export function measureConfigName(cfg: MeasureConfig): string {
   if (t === "BiPol") return "BiPol";
   if (t === "MECNormalized") return `MEC(${p.alpha ?? 2},${p.beta ?? 1.15})N`;
   if (t === "MEC") return `MEC(${p.alpha ?? 2},${p.beta ?? 1.15})`;
+  if (t === "GeneralizedMEC")
+    return `GMEC(${p.alpha ?? 2},${p.alienation ?? "d"})`;
   if (t === "EMD") return "EMD";
   if (t === "Shannon") return "Shannon";
   if (t === "VanDerEijk") return "VanDerEijk";
@@ -123,9 +146,27 @@ export function parseMeasureName(name: string): MeasureConfig | null {
   // MEC(a,b) → MEC
   m = name.match(/^MEC\(([^,]+),([^)]+)\)$/);
   if (m) {
+    const maybeBeta = parseFloat(m[2]);
+    if (!Number.isNaN(maybeBeta)) {
+      return {
+        type: "MEC",
+        params: { alpha: parseFloat(m[1]), beta: maybeBeta },
+      };
+    }
+
+    // MEC(a,fn) → GeneralizedMEC (benchmark convention)
     return {
-      type: "MEC",
-      params: { alpha: parseFloat(m[1]), beta: parseFloat(m[2]) },
+      type: "GeneralizedMEC",
+      params: { alpha: parseFloat(m[1]), alienation: m[2] },
+    };
+  }
+
+  // GMEC(a,fn) → GeneralizedMEC (API/UI convention)
+  m = name.match(/^GMEC\(([^,]+),(.+)\)$/);
+  if (m) {
+    return {
+      type: "GeneralizedMEC",
+      params: { alpha: parseFloat(m[1]), alienation: m[2] },
     };
   }
 

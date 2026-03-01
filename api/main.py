@@ -1,8 +1,6 @@
 import numpy as np
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-
 from measures.metrics.literature import (
     EMDPol,
     EstebanRay,
@@ -11,7 +9,8 @@ from measures.metrics.literature import (
     ShannonPol,
     VanDerEijkPol,
 )
-from measures.metrics.proposed import MEC, BiPol, MECNormalized
+from measures.metrics.proposed import MEC, BiPol, GeneralizedMEC, MECNormalized
+from pydantic import BaseModel
 
 app = FastAPI()
 
@@ -35,7 +34,7 @@ ALIENATION_FUNCTIONS = {
 
 
 class MeasureConfig(BaseModel):
-    type: str  # EstebanRay, BiPol, MECNormalized, MEC, EMD, Shannon, VanDerEijk, Experts, GeneralizedER
+    type: str  # EstebanRay, BiPol, MECNormalized, MEC, GeneralizedMEC, EMD, Shannon, VanDerEijk, Experts, GeneralizedER
     params: dict[str, float | str] = {}
 
 
@@ -76,6 +75,16 @@ def build_measure(cfg: MeasureConfig):
         alpha = float(p.get("alpha", 2))
         beta = float(p.get("beta", 1.15))
         return f"MEC({alpha},{beta})", MEC(alpha=alpha, beta=beta)
+
+    if t == "GeneralizedMEC":
+        alpha = float(p.get("alpha", 2))
+        alienation_key = str(p.get("alienation", "d"))
+        alienation_fn = ALIENATION_FUNCTIONS.get(alienation_key)
+        if alienation_fn is None:
+            raise ValueError(f"Unknown alienation: {alienation_key}")
+        return f"GMEC({alpha},{alienation_key})", GeneralizedMEC(
+            alpha=alpha, alienation=alienation_fn
+        )
 
     if t == "EMD":
         return "EMD", EMDPol()

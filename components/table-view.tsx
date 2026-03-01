@@ -238,9 +238,20 @@ export function TableView({ table }: Props) {
         missingConfigs.map((e) => e.config),
       )
         .then((results) => {
+          // Keep table keys stable (e.g. GMEC(1,...) instead of GMEC(1.0,...)).
+          const normalizedResults = results.map((result, idx) => ({
+            ...result,
+            name: missingConfigs[idx]?.name ?? result.name,
+          }));
+
+          const byName = new Map(dist.measures.map((m) => [m.name, m]));
+          for (const result of normalizedResults) {
+            byName.set(result.name, result);
+          }
+
           saveDistribution({
             ...dist,
-            measures: [...dist.measures, ...results],
+            measures: Array.from(byName.values()),
           });
         })
         .catch(() => {
